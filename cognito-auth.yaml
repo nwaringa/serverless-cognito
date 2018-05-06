@@ -1,0 +1,33 @@
+﻿AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Parameters:
+  userpoolid:
+    Type: String
+    Description: userpoolid of your cognitopool 
+  clientid:
+    Type: String
+    Description: client id of your cognito pool
+Resources:
+  cognitoauth:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: lambda.lambda_handler
+      Runtime: python3.6
+      CodeUri: s3://marek-serverless/serverless-cognito.zip
+      Description: ''
+      MemorySize: 128
+      Timeout: 10
+      Events:
+        Api1:
+          Type: Api
+          Properties:
+            Path: '/{proxy+}'
+            Method: ANY
+      Environment:
+        Variables:
+          userpoolid: !Ref userpoolid
+          clientid: !Ref clientid
+Outputs:
+  APIName:
+    Description: API GW
+    Value: !Ref ServerlessRestApi
