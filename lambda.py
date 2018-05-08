@@ -5,13 +5,14 @@
 # coding: utf-8
 
 import boto3, json, pprint, re, os, time
+from urllib.parse import unquote
 
 # take lambda environment variables for cognito
 clientid    = os.environ['clientid']
 userpoolid  = os.environ['userpoolid']
 
-# setup session with cognito
 c           = boto3.client('cognito-idp')
+
 
 # return html with a 200 code, the client headers are printed by default
 def return_html(txt, title, head):
@@ -30,10 +31,10 @@ def get_creds(para):
     
     for y in para.split('&'):
         if re.search('username', y):
-            user    = y[9:]
+            user    = unquote(y[9:])
         elif re.search('password', y):
-            pasw    = y[9:]
-            
+            pasw    = unquote(y[9:])
+         
     return user, pasw
     
 # post page for login
@@ -45,12 +46,16 @@ def post_login(head, para):
         
         # return a succesful login message or print the exception to the user (invalid credentials, wrong parsed characters, user does not exist)
         try:
-            r   = c.initiate_auth(AuthFlow = 'USER_PASSWORD_AUTH', AuthParameters = {'USERNAME': str(user), 'PASSWORD': str(pasw)}, ClientId = clientid)
-            return return_html(str('<h1>logged in succesfully with '+str(user)+'</h1>'+r['AuthenticationResult']['AccessToken']+'<br><br>'+r))
+            r = c.initiate_auth(ClientId = os.environ['clientid'],
+                AuthFlow = 'USER_PASSWORD_AUTH', 
+                AuthParameters = {'USERNAME' : user.strip(), 'PASSWORD' : pasw.strip()}
+            )
+            x = return_html('<h1>logged in succesfully with '+str(user)+'</h1>'+str(r['ResponseMetadata'])+'<br>', '', '')
 
         except Exception as e:
-            print(e)
-            return return_html(str(e), 'error', '')
+            x = return_html(e, '', '')
+
+        return x
         
     return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, head)
 
@@ -63,7 +68,6 @@ def post_register(head, para):
         try:
             print(c.sign_up(Username = user, Password = pasw, ClientId = clientid, UserAttributes = [{'Name': 'email', 'Value': 'devnull@example.com'}]))  #, {'Name' : 'color', 'Value' : str(color)}]))
             print(c.admin_confirm_sign_up(UserPoolId = userpoolid, Username = user))
-
             return return_html('created user '+user, 'created user '+user, '')
         
         except Exception as e:
@@ -72,7 +76,7 @@ def post_register(head, para):
     else:
         return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, he)
 
-# return html for login and registration, optionally another field can be added through the txt variable
+# return html for login and registration, optionally another field can be added through the opt variable
 def get_cred_page(head, txt, opt):
     body    = '''<br><form method="post">
     username: \t <input type="text" name="username" /><br />
