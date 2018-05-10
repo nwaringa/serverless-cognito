@@ -1,12 +1,6 @@
-﻿AWSTemplateFormatVersion: '2010-09-09'
+AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
-Parameters:
-  userpoolid:
-    Type: String
-    Description: userpoolid of your cognitopool 
-  clientid:
-    Type: String
-    Description: client id of your cognito pool
+
 Resources:
   cognitoauth:
     Type: 'AWS::Serverless::Function'
@@ -25,9 +19,34 @@ Resources:
             Method: ANY
       Environment:
         Variables:
-          userpoolid: !Ref userpoolid
-          clientid: !Ref clientid
+          userpoolid: !Ref cognitopool
+          clientid: !Ref cognitoclient
+
+  cognitopool:
+    Type: "AWS::Cognito::UserPool"
+    Properties:
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+        UnusedAccountValidityDays: 1
+      AliasAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 6
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+          RequireUppercase: false
+
+  cognitoclient:
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties:
+      UserPoolId:
+        Ref: cognitopool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ADMIN_NO_SRP_AUTH
+
 Outputs:
-  APIName:
-    Description: API GW
-    Value: !Ref ServerlessRestApi
+  WebInterface:
+    Value: { "Fn::Sub" : "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/login"}
