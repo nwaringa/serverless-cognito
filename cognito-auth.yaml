@@ -21,6 +21,8 @@ Resources:
         Variables:
           userpoolid: !Ref cognitopool
           clientid: !Ref cognitoclient
+      Policies:
+        - AmazonCognitoPowerUser 
 
   cognitopool:
     Type: "AWS::Cognito::UserPool"
@@ -46,6 +48,7 @@ Resources:
       GenerateSecret: false
       ExplicitAuthFlows:
         - ADMIN_NO_SRP_AUTH
+        - USER_PASSWORD_AUTH
 
 Outputs:
   WebInterface:
