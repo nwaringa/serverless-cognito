@@ -10,9 +10,7 @@ from urllib.parse import unquote
 # take lambda environment variables for cognito
 clientid    = os.environ['clientid']
 userpoolid  = os.environ['userpoolid']
-
 c           = boto3.client('cognito-idp')
-
 
 # return html with a 200 code, the client headers are printed by default
 def return_html(txt, title, head):
@@ -57,7 +55,7 @@ def post_login(head, para):
 
         return x
         
-    return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, head)
+    return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, '', head)
 
 # post page for register
 def post_register(head, para):
@@ -66,15 +64,16 @@ def post_register(head, para):
     # the password cannot be shorter than 6 characters in cognito, usernames can be 1 character
     if len(user) > 1 and len(pasw) > 5:
         try:
-            print(c.sign_up(Username = user, Password = pasw, ClientId = clientid, UserAttributes = [{'Name': 'email', 'Value': 'devnull@example.com'}]))  #, {'Name' : 'color', 'Value' : str(color)}]))
-            print(c.admin_confirm_sign_up(UserPoolId = userpoolid, Username = user))
+            print(c.sign_up(Username = user, Password = pasw, ClientId = clientid, UserAttributes = [{'Name': 'email', 'Value': 'devnull@example.com'}]))
+            print(c.admin_confirm_sign_up(Username = user, UserPoolId = userpoolid))
+
             return return_html('created user '+user, 'created user '+user, '')
         
         except Exception as e:
             return return_html(e, 'error', head)
             
     else:
-        return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, he)
+        return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, head)
 
 # return html for login and registration, optionally another field can be added through the opt variable
 def get_cred_page(head, txt, opt):

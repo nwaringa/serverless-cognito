@@ -7,6 +7,7 @@ Resources:
     Properties:
       Handler: lambda.lambda_handler
       Runtime: python3.6
+      Policies: AmazonCognitoPowerUser
       CodeUri: s3://marek-serverless/serverless-cognito.zip
       Description: ''
       MemorySize: 128
@@ -21,8 +22,6 @@ Resources:
         Variables:
           userpoolid: !Ref cognitopool
           clientid: !Ref cognitoclient
-      Policies:
-        - AmazonCognitoPowerUser 
 
   cognitopool:
     Type: "AWS::Cognito::UserPool"
