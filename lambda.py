@@ -4,22 +4,21 @@
 # www.marek.rocks
 # coding: utf-8
 
-import boto3, json, pprint, re, os, time
+import boto3, re, os, time
 from urllib.parse import unquote
 
 # take lambda environment variables for cognito
 clientid    = os.environ['clientid']
 userpoolid  = os.environ['userpoolid']
 c           = boto3.client('cognito-idp')
+d           = boto3.resource('dynamodb').Table(os.environ['dynamotable'])
 
 # return html with a 200 code, the client headers are printed by default
-def return_html(txt, title, head):
-    # head  = pprint.PrettyPrinter().pformat(head)
-
+def return_html(txt, title, head, cookie):
     return {
         'statusCode': '200', 
-        'body': '<center><h1>'+title+'</h1><a href = "./login">login</a> | <a href = "./register">register</a> | <a href = "https://marek.rocks">marek.rocks</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(head), 
-        'headers': {'Content-Type': 'text/html', 'charset': 'utf-8'}
+        'body': '<center><h1>'+title+'</h1><a href = "./login">login</a> | <a href = "./register">register</a> | <a href = "./users">see all users</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(head), 
+        'headers': {'Content-Type': 'text/html', 'charset': 'utf-8', 'set-cookie': cookie}
     } 
     
 # get the POSTed string username and password from the headers
@@ -67,7 +66,19 @@ def post_register(head, para):
             print(c.sign_up(Username = user, Password = pasw, ClientId = clientid, UserAttributes = [{'Name': 'email', 'Value': 'devnull@example.com'}]))
             print(c.admin_confirm_sign_up(Username = user, UserPoolId = userpoolid))
 
-            return return_html('created user '+user, 'created user '+user, '')
+            # TODO - generate random cookie value
+            cookie  = 'cookie'
+            
+            # store the current cookie value in dynamodb
+            d.put_item(TableName = os.environ['dynamo_table'], 
+                Item = {
+                    'user'      : user,
+                    'cookie'    : cookie
+                }
+            )
+
+            # return the cookie to the browser
+            return return_html('created user '+user, 'created user '+user, '', cookie)
         
         except Exception as e:
             return return_html(e, 'error', head)
@@ -108,4 +119,4 @@ def lambda_handler(event, context):
 
     # if another request was submitted, return an error code
     else:
-        return return_html('invalid request, try <a href="./login">login</a> instead', 'invalid request', head)
+        return return_html('invalid request, try <a href="./login">login</a> instead', 'invalid request', head, '')

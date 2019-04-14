@@ -7,7 +7,9 @@ Resources:
     Properties:
       Handler: lambda.lambda_handler
       Runtime: python3.6
-      Policies: AmazonCognitoPowerUser
+      Policies: 
+        - AmazonCognitoPowerUser
+        - AmazonDynamoDBFullAccess
       CodeUri: s3://marek-serverless/serverless-cognito.zip
       Description: ''
       MemorySize: 128
@@ -22,6 +24,21 @@ Resources:
         Variables:
           userpoolid: !Ref cognitopool
           clientid: !Ref cognitoclient
+
+  cookies:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      AttributeDefinitions:
+        -
+          AttributeName: "user"
+          AttributeType: "S"
+
+      KeySchema:
+        -
+          AttributeName: "user"
+          KeyType: "HASH"        
+
+      BillingMode: PAY_PER_REQUEST
 
   cognitopool:
     Type: "AWS::Cognito::UserPool"
@@ -51,4 +68,4 @@ Resources:
 
 Outputs:
   WebInterface:
-    Value: { "Fn::Sub" : "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/login"}
+    Value: { "Fn::Sub" : "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/login/"}
