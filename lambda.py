@@ -5,6 +5,8 @@
 # coding: utf-8
 
 import boto3, re, os, time
+from random import randint
+from boto3.dynamodb.conditions import Key, Attr
 from urllib.parse import unquote
 
 # take lambda environment variables for cognito
@@ -15,10 +17,15 @@ d           = boto3.resource('dynamodb').Table(os.environ['dynamotable'])
 
 # return html with a 200 code, the client headers are printed by default
 def return_html(txt, title, head, cookie):
+    if len(cookie) == 0:
+        h    = {'Content-Type': 'text/html', 'charset': 'utf-8'}
+    else:
+        h    = {'Content-Type': 'text/html', 'charset': 'utf-8', 'Set-Cookie': cookie}
+
     return {
         'statusCode': '200', 
-        'body': '<center><h1>'+title+'</h1><a href = "./login">login</a> | <a href = "./register">register</a> | <a href = "./users">see all users</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(head), 
-        'headers': {'Content-Type': 'text/html', 'charset': 'utf-8', 'set-cookie': cookie}
+        'body': '<center><h1>'+title+'</h1><a href = "./login">login</a> | <a href = "./register">register</a> | <a href = "./users">see all users</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(cookie)+'<br>'+str(head), 
+        'headers': h
     } 
     
 # get the POSTed string username and password from the headers
@@ -47,14 +54,37 @@ def post_login(head, para):
                 AuthFlow = 'USER_PASSWORD_AUTH', 
                 AuthParameters = {'USERNAME' : user.strip(), 'PASSWORD' : pasw.strip()}
             )
-            x = return_html('<h1>logged in succesfully with '+str(user)+'</h1>'+str(r['ResponseMetadata'])+'<br>', '', '')
+            
+            cookie      = make_cookie(user)
+            
+            x = return_html('<h1>logged in succesfully with '+str(user)+'</h1>'+str(r['ResponseMetadata'])+'<br>', '', '', cookie)
 
         except Exception as e:
-            x = return_html(e, '', '')
+            x = return_html('error with login '+str(e), '', '', '')
 
         return x
-        
-    return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, '', head)
+    
+    else:
+        return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, '', head)
+
+def check_cookie(user, cookie):
+    x   = d.query(IndexName = os.environ['dynamotable'], KeyConditionExpression = Key('user').eq(user), FilterExpression= Key('cookie').gt(str(cookie)))
+    print('cookie-check', str(x))
+
+def make_cookie(user):
+    cookie  = str(randint(10, 100))
+            
+    # store the current cookie value in dynamodb
+    d.put_item(TableName = os.environ['dynamotable'], 
+        Item = {
+            'user'      : user,
+            'cookie'    : cookie
+        }
+    )
+    
+    x  = 'user='+str(user)+'&cookie='+cookie
+
+    return x
 
 # post page for register
 def post_register(head, para):
@@ -66,25 +96,16 @@ def post_register(head, para):
             print(c.sign_up(Username = user, Password = pasw, ClientId = clientid, UserAttributes = [{'Name': 'email', 'Value': 'devnull@example.com'}]))
             print(c.admin_confirm_sign_up(Username = user, UserPoolId = userpoolid))
 
-            # TODO - generate random cookie value
-            cookie  = 'cookie'
-            
-            # store the current cookie value in dynamodb
-            d.put_item(TableName = os.environ['dynamo_table'], 
-                Item = {
-                    'user'      : user,
-                    'cookie'    : cookie
-                }
-            )
+            cookie  = make_cookie(user)
 
             # return the cookie to the browser
             return return_html('created user '+user, 'created user '+user, '', cookie)
         
         except Exception as e:
-            return return_html(e, 'error', head)
+            return return_html('error with registration '+str(e), '', head, '')
             
     else:
-        return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, head)
+        return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, head, '')
 
 # return html for login and registration, optionally another field can be added through the opt variable
 def get_cred_page(head, txt, opt):
@@ -94,14 +115,21 @@ def get_cred_page(head, txt, opt):
     body    += opt
     body    += '''<input type="submit" /></form><hr />'''
     
-    return return_html(body, txt, head)
+    return return_html(body, txt, head, '')
 
 # lambda handler
-def lambda_handler(event, context):
+def handler(event, context):
     head    = str(event)
     meth    = str(event['httpMethod'])
     path    = str(event['path']).strip('/')
     para    = str(event['body'])
+
+    try:
+        cookie  = str(event['Cookie'])
+        check_cookie(cookie)
+
+    except:
+        cookie  = ''
 
     # handle get requests by returning an HTML page
     if meth == 'GET' and path == 'register':

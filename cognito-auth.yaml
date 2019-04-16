@@ -5,8 +5,8 @@ Resources:
   cognitoauth:
     Type: 'AWS::Serverless::Function'
     Properties:
-      Handler: lambda.lambda_handler
-      Runtime: python3.6
+      Handler: lambda.handler
+      Runtime: python3.7
       Policies: 
         - AmazonCognitoPowerUser
         - AmazonDynamoDBFullAccess
