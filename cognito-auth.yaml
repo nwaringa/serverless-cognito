@@ -14,6 +14,7 @@ Resources:
       Description: ''
       MemorySize: 128
       Timeout: 10
+      Tracing: Active
       Events:
         Api1:
           Type: Api
@@ -24,6 +25,7 @@ Resources:
         Variables:
           userpoolid: !Ref cognitopool
           clientid: !Ref cognitoclient
+          dynamotable: !Ref cookies
 
   cookies:
     Type: "AWS::DynamoDB::Table"

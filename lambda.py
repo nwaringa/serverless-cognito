@@ -24,7 +24,7 @@ def return_html(txt, title, head, cookie):
 
     return {
         'statusCode': '200', 
-        'body': '<center><h1>'+title+'</h1><a href = "./login">login</a> | <a href = "./register">register</a> | <a href = "./users">see all users</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(cookie)+'<br>'+str(head), 
+        'body': '<center><h1>'+title+'</h1><a href = "./login">login</a> | <a href = "./register">register</a> | <a href = "./profile">your profile</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(cookie)+'<br>', 
         'headers': h
     } 
     
@@ -65,14 +65,22 @@ def post_login(head, para):
         return x
     
     else:
-        return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, '', head)
+        return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, '', head, '')
 
-def check_cookie(user, cookie):
-    x   = d.query(IndexName = os.environ['dynamotable'], KeyConditionExpression = Key('user').eq(user), FilterExpression= Key('cookie').gt(str(cookie)))
-    print('cookie-check', str(x))
+def check_cookie(cookie):
+    user    = cookie.split('&')[0]
+    x       = d.query(KeyConditionExpression = Key('user').eq(user))    #, FilterExpression= Key('cookie').eq(str(cookie)))
+
+    if x['Count'] == int(0):
+        print('not found '+user+' '+cookie)
+        return ''
+
+    else:
+        print('found '+user+' '+cookie)   
+        return user
 
 def make_cookie(user):
-    cookie  = str(randint(10, 100))
+    cookie  = str(randint(1000, 100000))
             
     # store the current cookie value in dynamodb
     d.put_item(TableName = os.environ['dynamotable'], 
@@ -117,6 +125,16 @@ def get_cred_page(head, txt, opt):
     
     return return_html(body, txt, head, '')
 
+def get_profile_page(head, txt, opt, auth):
+    body        = '<br>'
+    
+    if auth != '':
+        body    += 'logged in as '+str(auth)
+    else:
+        body    += 'failed login as '+str(auth)
+
+    return return_html(body, txt, head, '')
+
 # lambda handler
 def handler(event, context):
     head    = str(event)
@@ -125,26 +143,35 @@ def handler(event, context):
     para    = str(event['body'])
 
     try:
-        cookie  = str(event['Cookie'])
-        check_cookie(cookie)
+        c       = str(event['Cookie'])
+        print('cookie '+c)
+        auth    = check_cookie(c)
 
     except:
-        cookie  = ''
+        auth    = ''
+
+    print(path, meth, para, auth)
 
     # handle get requests by returning an HTML page
     if meth == 'GET' and path == 'register':
-        return get_cred_page(head, 'register here', '')
+        x   = get_cred_page(head, 'register here', '')
+
+    elif meth == 'GET' and path == 'profile':
+        x   = get_profile_page(head, 'your profile', '', auth)
 
     elif meth == 'GET' and path == 'login':
-        return get_cred_page(head, 'login here', '')
+        x   = get_cred_page(head, 'login here', '')
       
     # hande post requests by submitting the query strings to the api        
     elif meth == 'POST' and path == 'register':
-        return post_register(head, para)
+        x   = post_register(head, para)
         
     elif meth == 'POST' and path == 'login':
-        return post_login(head, para)    
+        x   = post_login(head, para)    
 
     # if another request was submitted, return an error code
     else:
-        return return_html('invalid request, try <a href="./login">login</a> instead', 'invalid request', head, '')
+        x   = return_html('invalid request, try <a href="./login">login</a> instead', 'invalid request', head, '')
+
+    print(x)
+    return x

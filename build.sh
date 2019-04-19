@@ -8,7 +8,7 @@
 ts=$(date +%s)
 
 # zip the contents of the local dir excluding any git directories
-zip -r serverless-cognito.zip . -x *.git* *.DS_Store*
+zip -r serverless-cognito.zip . -x *.git* *.DS_Store* *.zip*
 
 # copy the zip to an s3 bucket
 aws s3 cp serverless-cognito.zip s3://marek-serverless/
