@@ -7,6 +7,7 @@
 import boto3, re, os, time
 from random import randint
 from boto3.dynamodb.conditions import Key, Attr
+from urllib.parse import unquote
 
 # take lambda environment variables for cognito
 clientid    = os.environ['clientid']
@@ -22,8 +23,8 @@ def return_html(txt, title, head, cookie):
         h    = {'Content-Type': 'text/html', 'charset': 'utf-8', 'Set-Cookie': cookie}
 
     return {
-        'statusCode': '200', 
-        'body': '<html><body><center><h1>'+title+'</h1>'+auth+'<a href = "./login">login</a> | <a href = "./register">register</a> | <a href = "./profile">your profile</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(cookie)+'<br></body></html>', 
+        'statusCode': 200, 
+        'body': '<html><body><center><h1>'+title+'</h1>'+auth+'<a href = "'+url+'/login">login</a> | <a href = "'+url+'/register">register</a> | <a href = "'+url+'/profile">your profile</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(cookie)+'<br></body></html>', 
         'headers': h
     } 
     
@@ -127,10 +128,7 @@ def get_cred_page(head, txt):
     return return_html(body, txt, head, '')
 
 def get_profile_page(head, txt, user, cookie):    
-    if auth != '':
-        body    = '<br><br>logged in as '+str(user)+' using cookie: '+str(cookie)+'<br><br>'
-    else:
-        body    = '<br><br>failed login as '+str(user)+'<br><br>'
+    body        = '<br><br>Welcome to your profile '+str(user)+', it\'s great that you made an account.<br>You will see an updated profile page here soon, stay tuned.<br><br>'
 
     return return_html(body, txt, head, '')
 
@@ -138,25 +136,30 @@ def get_cookie_status(cookie):
     user    = check_cookie(cookie)
 
     if user != 'none':
-        body    = '<br>logged in as '+str(user)+'<br>'
+        body    = '<br><br>success! logged in as '+str(user)+' with cookie '+str(cookie)+'<br><br>'
     else:
-        body    = '<br>failed login as '+str(user)+'<br>'   
+        body    = '<br><br>failed! not logged in with cookie '+str(cookie)+'<br><br>'
     
-    return body
+    return body, user
 
 # lambda handler
 def handler(event, context):
+    global auth
+    global url
+
     head    = str(event)
     meth    = str(event['httpMethod'])
     path    = str(event['path']).strip('/')
     para    = str(event['body'])
+    host    = str(event['headers']['Host'])
+    url     = str('https://'+host+'/Prod')
+
     print('head ', head)
 
-    global auth
     try:
         cookie  = str(event['headers']['Cookie'])
         print('cookie '+cookie)
-        auth    = get_cookie_status(cookie)
+        auth, user    = get_cookie_status(cookie)
 
     except Exception as e:
         cookie  = ''
@@ -170,7 +173,7 @@ def handler(event, context):
         x   = get_cred_page(head, 'register here')
 
     elif meth == 'GET' and path == 'profile':
-        x   = get_profile_page(head, 'your profile', auth, cookie)
+        x   = get_profile_page(head, 'your profile', user, cookie)
 
     elif meth == 'GET' and path == 'login':
         x   = get_cred_page(head, 'login here')
