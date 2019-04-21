@@ -7,7 +7,6 @@
 import boto3, re, os, time
 from random import randint
 from boto3.dynamodb.conditions import Key, Attr
-from urllib.parse import unquote
 
 # take lambda environment variables for cognito
 clientid    = os.environ['clientid']
@@ -24,7 +23,7 @@ def return_html(txt, title, head, cookie):
 
     return {
         'statusCode': '200', 
-        'body': '<center><h1>'+title+'</h1><a href = "./login">login</a> | <a href = "./register">register</a> | <a href = "./profile">your profile</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(cookie)+'<br>', 
+        'body': '<html><body><center><h1>'+title+'</h1>'+auth+'<a href = "./login">login</a> | <a href = "./register">register</a> | <a href = "./profile">your profile</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(cookie)+'<br></body></html>', 
         'headers': h
     } 
     
@@ -67,13 +66,16 @@ def post_login(head, para):
     else:
         return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, '', head, '')
 
-def check_cookie(cookie):
-    user    = cookie.split('&')[0]
-    x       = d.query(KeyConditionExpression = Key('user').eq(user))    #, FilterExpression= Key('cookie').eq(str(cookie)))
+def check_cookie(x):
+    user    = x.split('&')[0].split('=')[1]
+    cookie  = x.split('&')[1].split('=')[1]
+
+    print('check_cookie: '+str(user)+' '+str(cookie))
+    x       = d.query(KeyConditionExpression = Key('user').eq(user), FilterExpression= Key('cookie').eq(str(cookie)))
 
     if x['Count'] == int(0):
         print('not found '+user+' '+cookie)
-        return ''
+        return 'none'
 
     else:
         print('found '+user+' '+cookie)   
@@ -116,24 +118,31 @@ def post_register(head, para):
         return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, head, '')
 
 # return html for login and registration, optionally another field can be added through the opt variable
-def get_cred_page(head, txt, opt):
+def get_cred_page(head, txt):
     body    = '''<br><form method="post">
     username: \t <input type="text" name="username" /><br />
-    password: \t <input type="password" name="password" /><br />'''
-    body    += opt
-    body    += '''<input type="submit" /></form><hr />'''
+    password: \t <input type="password" name="password" /><br />
+    <input type="submit" /></form><hr />'''
     
     return return_html(body, txt, head, '')
 
-def get_profile_page(head, txt, opt, auth):
-    body        = '<br>'
-    
+def get_profile_page(head, txt, user, cookie):    
     if auth != '':
-        body    += 'logged in as '+str(auth)
+        body    = '<br><br>logged in as '+str(user)+' using cookie: '+str(cookie)+'<br><br>'
     else:
-        body    += 'failed login as '+str(auth)
+        body    = '<br><br>failed login as '+str(user)+'<br><br>'
 
     return return_html(body, txt, head, '')
+
+def get_cookie_status(cookie):
+    user    = check_cookie(cookie)
+
+    if user != 'none':
+        body    = '<br>logged in as '+str(user)+'<br>'
+    else:
+        body    = '<br>failed login as '+str(user)+'<br>'   
+    
+    return body
 
 # lambda handler
 def handler(event, context):
@@ -141,26 +150,30 @@ def handler(event, context):
     meth    = str(event['httpMethod'])
     path    = str(event['path']).strip('/')
     para    = str(event['body'])
+    print('head ', head)
 
+    global auth
     try:
-        c       = str(event['Cookie'])
-        print('cookie '+c)
-        auth    = check_cookie(c)
+        cookie  = str(event['headers']['Cookie'])
+        print('cookie '+cookie)
+        auth    = get_cookie_status(cookie)
 
-    except:
-        auth    = ''
+    except Exception as e:
+        cookie  = ''
+        print('cookie error '+str(e))
+        auth    = 'none'
 
     print(path, meth, para, auth)
 
     # handle get requests by returning an HTML page
     if meth == 'GET' and path == 'register':
-        x   = get_cred_page(head, 'register here', '')
+        x   = get_cred_page(head, 'register here')
 
     elif meth == 'GET' and path == 'profile':
-        x   = get_profile_page(head, 'your profile', '', auth)
+        x   = get_profile_page(head, 'your profile', auth, cookie)
 
     elif meth == 'GET' and path == 'login':
-        x   = get_cred_page(head, 'login here', '')
+        x   = get_cred_page(head, 'login here')
       
     # hande post requests by submitting the query strings to the api        
     elif meth == 'POST' and path == 'register':
@@ -171,7 +184,7 @@ def handler(event, context):
 
     # if another request was submitted, return an error code
     else:
-        x   = return_html('invalid request, try <a href="./login">login</a> instead', 'invalid request', head, '')
+        x   = return_html('invalid request, try <a href="/login">login</a> instead', 'invalid request', head, '')
 
-    print(x)
-    return x
+    print('html '+str(x))
+    return(x)
