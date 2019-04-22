@@ -4,7 +4,8 @@
 # www.marek.rocks
 # coding: utf-8
 
-import boto3, re, os, time
+# import neccesary libraries
+import boto3, hashlib, re, os, time
 from random import randint
 from boto3.dynamodb.conditions import Key, Attr
 from urllib.parse import unquote
@@ -20,7 +21,7 @@ def return_html(txt, title, head, cookie):
     if len(cookie) == 0:
         h    = {'Content-Type': 'text/html', 'charset': 'utf-8'}
     else:
-        h    = {'Content-Type': 'text/html', 'charset': 'utf-8', 'Set-Cookie': cookie}
+        h    = {'Content-Type': 'text/html', 'charset': 'utf-8', 'Set-Cookie': cookie+' ; Secure; HttpOnly'}
 
     return {
         'statusCode': 200, 
@@ -41,7 +42,7 @@ def get_creds(para):
          
     return user, pasw
     
-# post page for login
+# return html for the /login post page
 def post_login(head, para):
     user, pasw  = get_creds(para)
     
@@ -67,6 +68,7 @@ def post_login(head, para):
     else:
         return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, '', head, '')
 
+# check if the cookie is valid based on the full cookie string, return the user
 def check_cookie(x):
     user    = x.split('&')[0].split('=')[1]
     cookie  = x.split('&')[1].split('=')[1]
@@ -82,14 +84,20 @@ def check_cookie(x):
         print('found '+user+' '+cookie)   
         return user
 
+# generate a random cookie for the user and write it to DynamoDB.
 def make_cookie(user):
-    cookie  = str(randint(1000, 100000))
-            
+    now     = int(time.time())
+    ttl     = now + 259200
+
+    rand    = str(randint(1000, 100000) * now)
+    cookie  = hashlib.md5(rand.encode('utf-8')).hexdigest()
+
     # store the current cookie value in dynamodb
     d.put_item(TableName = os.environ['dynamotable'], 
         Item = {
             'user'      : user,
-            'cookie'    : cookie
+            'cookie'    : cookie,
+            'ttl'       : ttl
         }
     )
     
@@ -97,7 +105,7 @@ def make_cookie(user):
 
     return x
 
-# post page for register
+# post page for a /register request
 def post_register(head, para):
     user, pasw  = get_creds(para)
     
@@ -118,7 +126,7 @@ def post_register(head, para):
     else:
         return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, head, '')
 
-# return html for login and registration, optionally another field can be added through the opt variable
+# return html for /login and /registration paths
 def get_cred_page(head, txt):
     body    = '''<br><form method="post">
     username: \t <input type="text" name="username" /><br />
@@ -127,11 +135,13 @@ def get_cred_page(head, txt):
     
     return return_html(body, txt, head, '')
 
+# return html for the /profile page
 def get_profile_page(head, txt, user, cookie):    
     body        = '<br><br>Welcome to your profile '+str(user)+', it\'s great that you made an account.<br>You will see an updated profile page here soon, stay tuned.<br><br>'
 
     return return_html(body, txt, head, '')
 
+# check if the cookie is valid and return html
 def get_cookie_status(cookie):
     user    = check_cookie(cookie)
 
@@ -144,9 +154,11 @@ def get_cookie_status(cookie):
 
 # lambda handler
 def handler(event, context):
+    # seth auth and url variables to global
     global auth
     global url
 
+    # read the request variables from the client
     head    = str(event)
     meth    = str(event['httpMethod'])
     path    = str(event['path']).strip('/')
@@ -156,11 +168,13 @@ def handler(event, context):
 
     print('head ', head)
 
+    # check if the cookie is valid
     try:
         cookie  = str(event['headers']['Cookie'])
         print('cookie '+cookie)
         auth, user    = get_cookie_status(cookie)
 
+    # if no cookie is found, set cookie and user fields to blank
     except Exception as e:
         cookie  = ''
         print('cookie error '+str(e))
@@ -169,19 +183,24 @@ def handler(event, context):
     print(path, meth, para, auth)
 
     # handle get requests by returning an HTML page
+    # register
     if meth == 'GET' and path == 'register':
         x   = get_cred_page(head, 'register here')
 
+    # profile
     elif meth == 'GET' and path == 'profile':
         x   = get_profile_page(head, 'your profile', user, cookie)
 
+    # login
     elif meth == 'GET' and path == 'login':
         x   = get_cred_page(head, 'login here')
       
-    # hande post requests by submitting the query strings to the api        
+    # hande post requests by submitting the query strings to the api
+    # register
     elif meth == 'POST' and path == 'register':
         x   = post_register(head, para)
         
+    # login
     elif meth == 'POST' and path == 'login':
         x   = post_login(head, para)    
 
@@ -189,5 +208,6 @@ def handler(event, context):
     else:
         x   = return_html('invalid request, try <a href="/login">login</a> instead', 'invalid request', head, '')
 
+    # print the results and return them to the browser
     print('html '+str(x))
     return(x)
