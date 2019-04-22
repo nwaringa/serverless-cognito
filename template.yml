@@ -1,6 +1,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
 
+Parameters:
+    BucketName:
+        Type: String
+    CodeKey:
+        Type: String
+
 Resources:
   cognitoauth:
     Type: 'AWS::Serverless::Function'
@@ -10,36 +16,42 @@ Resources:
       Policies: 
         - AmazonCognitoPowerUser
         - AmazonDynamoDBFullAccess
-      CodeUri: s3://marek-serverless/serverless-cognito.zip
-      Description: ''
+      CodeUri: 
+        Bucket: !Ref BucketName
+        Key: !Ref CodeKey
+      Description: 'Lambda function to serve HTML traffic through API Gateway'
       MemorySize: 128
       Timeout: 10
       Tracing: Active
+      ReservedConcurrentExecutions: 3
       Events:
-        Api1:
+        GetHtml:
           Type: Api
           Properties:
             Path: '/{proxy+}'
-            Method: ANY
+            Method: get
+        PostHtml:
+          Type: Api
+          Properties:
+            Path: '/{proxy+}'
+            Method: post
       Environment:
         Variables:
           userpoolid: !Ref cognitopool
           clientid: !Ref cognitoclient
-          dynamotable: !Ref cookies
+          dynamotable: !Ref cookietable
 
-  cookies:
+  cookietable:
     Type: "AWS::DynamoDB::Table"
     Properties:
       AttributeDefinitions:
         -
           AttributeName: "user"
           AttributeType: "S"
-
       KeySchema:
         -
           AttributeName: "user"
           KeyType: "HASH"        
-
       BillingMode: PAY_PER_REQUEST
       TimeToLiveSpecification:
           Enabled: true
@@ -56,8 +68,8 @@ Resources:
       Policies:
         PasswordPolicy:
           MinimumLength: 6
-          RequireLowercase: false
-          RequireNumbers: false
+          RequireLowercase: true
+          RequireNumbers: true
           RequireSymbols: false
           RequireUppercase: false
 
@@ -73,4 +85,4 @@ Resources:
 
 Outputs:
   WebInterface:
-    Value: { "Fn::Sub" : "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/login/"}
+    Value: { "Fn::Sub" : "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/profile/"}

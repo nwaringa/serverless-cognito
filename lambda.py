@@ -25,7 +25,7 @@ def return_html(txt, title, head, cookie):
 
     return {
         'statusCode': 200, 
-        'body': '<html><body><center><h1>'+title+'</h1>'+auth+'<a href = "'+url+'/login">login</a> | <a href = "'+url+'/register">register</a> | <a href = "'+url+'/profile">your profile</a> | <a href = "https://github.com/marekq/serverless-cognito">sourcecode</a><br><br>'+str(txt)+'</center><br>'+str(cookie)+'<br></body></html>', 
+        'body': '<html><body><center><h1>'+title+'</h1>'+auth+'<a href = "'+url+'/login">login</a> | <a href = "'+url+'/register">register</a> | <a href = "'+url+'/profile">your profile</a><br><br>'+str(txt)+'</center><br>'+str(cookie)+'<br></body></html>', 
         'headers': h
     } 
     
@@ -136,19 +136,25 @@ def get_cred_page(head, txt):
     return return_html(body, txt, head, '')
 
 # return html for the /profile page
-def get_profile_page(head, txt, user, cookie):    
-    body        = '<br><br>Welcome to your profile '+str(user)+', it\'s great that you made an account.<br>You will see an updated profile page here soon, stay tuned.<br><br>'
+def get_profile_page(head, txt, user, cookie):  
+    if user != 'none':  
+        body        = '<br><br>Welcome to your profile '+str(user)+', it\'s great that you made an account.<br>You will see an updated profile page here soon, stay tuned.<br><br>'
+    else:
+        body        = '<br><br>Please create an account or login using the links above.<br><br>'
 
     return return_html(body, txt, head, '')
 
 # check if the cookie is valid and return html
 def get_cookie_status(cookie):
-    user    = check_cookie(cookie)
+    if cookie != 'none': 
+        user    = check_cookie(cookie)
+    else:
+        user    = 'none'
 
     if user != 'none':
-        body    = '<br><br>success! logged in as '+str(user)+' with cookie '+str(cookie)+'<br><br>'
+        body    = '<br><br>Success! Logged in as '+str(user)+' with cookie '+str(cookie)+'<br><br>'
     else:
-        body    = '<br><br>failed! not logged in with cookie '+str(cookie)+'<br><br>'
+        body    = '<br><br>Failed! Not logged in.<br><br>'
     
     return body, user
 
@@ -172,13 +178,13 @@ def handler(event, context):
     try:
         cookie  = str(event['headers']['Cookie'])
         print('cookie '+cookie)
-        auth, user    = get_cookie_status(cookie)
 
     # if no cookie is found, set cookie and user fields to blank
     except Exception as e:
-        cookie  = ''
+        cookie  = 'none'
         print('cookie error '+str(e))
-        auth    = 'none'
+
+    auth, user    = get_cookie_status(cookie)
 
     print(path, meth, para, auth)
 

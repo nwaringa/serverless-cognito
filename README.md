@@ -5,7 +5,9 @@ Authenticate your users through Cognito, Lambda, API Gateway and DynamoDB. The s
 Installation
 ------------
 
-Deploy the 'template.yml' file using AWS SAM or CloudFormation. You can also use the [Serverless Application Repository](https://serverlessrepo.aws.amazon.com/applications/arn:aws:serverlessrepo:us-east-1:517266833056:applications~serverless-cognito). 
+There are two ways to install;
+1. You can  use the [Serverless Application Repository](https://serverlessrepo.aws.amazon.com/applications/arn:aws:serverlessrepo:us-east-1:517266833056:applications~serverless-cognito) to easily deploy the application in 2 minutes. Check the 'resources' tab under CloudFormation to find the login URL of your application.
+2. Edit 'build.sh' with your preferred region, s3 bucket and stack name to deploy manually. After running the bash script, the Lambda artifact will be uploaded to your bucket and used for the CloudFormation deploy. As a final step, you will see the URL you can use to access the application.
 
 Once you want to remove the service, simply delete the CloudFormation stack in your AWS account. 
 
