@@ -57,6 +57,25 @@ Resources:
           Enabled: true
           AttributeName: 'ttl'
 
+  weblogtable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      AttributeDefinitions: 
+        - 
+          AttributeName: "userid"
+          AttributeType: "S"
+        - 
+          AttributeName: "unixts"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "userid"
+          KeyType: "HASH"
+        - 
+          AttributeName: "unixts"
+          KeyType: "RANGE"    
+      BillingMode: PAY_PER_REQUEST
+
   cognitopool:
     Type: "AWS::Cognito::UserPool"
     Properties:
@@ -69,7 +88,7 @@ Resources:
         PasswordPolicy:
           MinimumLength: 6
           RequireLowercase: true
-          RequireNumbers: true
+          RequireNumbers: false
           RequireSymbols: false
           RequireUppercase: false
 
