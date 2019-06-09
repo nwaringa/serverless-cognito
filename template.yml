@@ -20,8 +20,8 @@ Resources:
         Bucket: !Ref BucketName
         Key: !Ref CodeKey
       Description: 'Lambda function to serve HTML traffic through API Gateway'
-      MemorySize: 128
-      Timeout: 10
+      MemorySize: 256
+      Timeout: 5
       Tracing: Active
       ReservedConcurrentExecutions: 3
       Events:
@@ -85,4 +85,4 @@ Resources:
 
 Outputs:
   WebInterface:
-    Value: { "Fn::Sub" : "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/profile/"}
+    Value: { "Fn::Sub" : "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/home/"}

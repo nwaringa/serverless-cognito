@@ -5,7 +5,7 @@
 # coding: utf-8
 
 # import neccesary libraries
-import boto3, hashlib, re, os, time
+import boto3, datetime, hashlib, re, os, time
 from random import randint
 from boto3.dynamodb.conditions import Key, Attr
 from urllib.parse import unquote
@@ -13,11 +13,12 @@ from urllib.parse import unquote
 # take lambda environment variables for cognito
 clientid    = os.environ['clientid']
 userpoolid  = os.environ['userpoolid']
-c           = boto3.client('cognito-idp')
-d           = boto3.resource('dynamodb').Table(os.environ['dynamotable'])
+
+cognito     = boto3.client('cognito-idp')
+dynamo      = boto3.resource('dynamodb').Table(os.environ['dynamotable'])
 
 # return html with a 200 code, the client headers are printed by default
-def return_html(txt, title, head, cookie):
+def return_html(body, title, head, cookie):
     if len(cookie) == 0:
         h    = {'Content-Type': 'text/html', 'charset': 'utf-8'}
     else:
@@ -25,7 +26,7 @@ def return_html(txt, title, head, cookie):
 
     return {
         'statusCode': 200, 
-        'body': '<html><body><center><h1>'+title+'</h1>'+auth+'<a href = "'+url+'/login">login</a> | <a href = "'+url+'/register">register</a> | <a href = "'+url+'/profile">your profile</a><br><br>'+str(txt)+'</center><br>'+str(cookie)+'<br></body></html>', 
+        'body': '<html><head><style>body {font-family: Arial, Helvetica, sans-serif;}</style></head><body><center><br><h1>'+title+'</h1><br><a href = "'+url+'/home">home</a> | <a href = "'+url+'/login">login</a> | <a href = "'+url+'/register">register</a> | <a href = "'+url+'/profile">your profile</a> | <a href = "'+url+'/logout">logout</a> | '+auth+'<br>'+str(body)+'</center><br></body></html>', 
         'headers': h
     } 
     
@@ -51,14 +52,14 @@ def post_login(head, para):
         
         # return a succesful login message or print the exception to the user (invalid credentials, wrong parsed characters, user does not exist)
         try:
-            r = c.initiate_auth(ClientId = os.environ['clientid'],
+            r = cognito.initiate_auth(ClientId = os.environ['clientid'],
                 AuthFlow = 'USER_PASSWORD_AUTH', 
                 AuthParameters = {'USERNAME' : user.strip(), 'PASSWORD' : pasw.strip()}
             )
             
             cookie      = make_cookie(user)
-            
-            x = return_html('<h1>logged in succesfully with '+str(user)+'</h1>'+str(r['ResponseMetadata'])+'<br>', '', '', cookie)
+            print(str(r['ResponseMetadata']))
+            x = return_html('logged in succesfully with '+str(user)+'<br>', 'logged in', '', cookie)
 
         except Exception as e:
             x = return_html('error with login '+str(e), '', '', '')
@@ -74,7 +75,7 @@ def check_cookie(x):
     cookie  = x.split('&')[1].split('=')[1]
 
     print('check_cookie: '+str(user)+' '+str(cookie))
-    x       = d.query(KeyConditionExpression = Key('user').eq(user), FilterExpression= Key('cookie').eq(str(cookie)))
+    x       = dynamo.query(KeyConditionExpression = Key('user').eq(user), FilterExpression= Key('cookie').eq(str(cookie)))
 
     if x['Count'] == int(0):
         print('not found '+user+' '+cookie)
@@ -89,11 +90,14 @@ def make_cookie(user):
     now     = int(time.time())
     ttl     = now + 259200
 
+    c       = datetime.datetime.utcnow() + datetime.timedelta(days = 3)
+    exp     = c.strftime("%a, %d %b %Y %H:%M:%S GMT")
+
     rand    = str(randint(1000, 100000) * now)
     cookie  = hashlib.md5(rand.encode('utf-8')).hexdigest()
 
     # store the current cookie value in dynamodb
-    d.put_item(TableName = os.environ['dynamotable'], 
+    dynamo.put_item(TableName = os.environ['dynamotable'], 
         Item = {
             'user'      : user,
             'cookie'    : cookie,
@@ -101,7 +105,7 @@ def make_cookie(user):
         }
     )
     
-    x  = 'user='+str(user)+'&cookie='+cookie
+    x  = 'user='+str(user)+'&cookie='+cookie+'; expires='+exp
 
     return x
 
@@ -112,8 +116,10 @@ def post_register(head, para):
     # the password cannot be shorter than 6 characters in cognito, usernames can be 1 character
     if len(user) > 1 and len(pasw) > 5:
         try:
-            print(c.sign_up(Username = user, Password = pasw, ClientId = clientid, UserAttributes = [{'Name': 'email', 'Value': 'devnull@example.com'}]))
-            print(c.admin_confirm_sign_up(Username = user, UserPoolId = userpoolid))
+
+            # create a new account for the user
+            print(cognito.sign_up(Username = user, Password = pasw, ClientId = clientid, UserAttributes = [{'Name': 'email', 'Value': 'devnull@example.com'}]))
+            print(cognito.admin_confirm_sign_up(Username = user, UserPoolId = userpoolid))
 
             cookie  = make_cookie(user)
 
@@ -127,20 +133,25 @@ def post_register(head, para):
         return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, head, '')
 
 # return html for /login and /registration paths
-def get_cred_page(head, txt):
-    body    = '''<br><form method="post">
-    username: \t <input type="text" name="username" /><br />
-    password: \t <input type="password" name="password" /><br />
-    <input type="submit" /></form><hr />'''
-    
+def get_cred_page(head, txt, user):
+
+    if user == 'none':
+        body    = '''<br><form method="post">
+        username \t <input type="text" name="username" /><br />
+        password \t <input type="password" name="password" /><br />
+        <input type="submit" /></form>'''
+
+    else:
+        body    = '<br>you are already logged in with user '+user+', do you want to <a href = "'+url+'/logout">logout</a> instead?<br>'
+
     return return_html(body, txt, head, '')
 
 # return html for the /profile page
 def get_profile_page(head, txt, user, cookie):  
     if user != 'none':  
-        body        = '<br><br>Welcome to your profile '+str(user)+', it\'s great that you made an account.<br>You will see an updated profile page here soon, stay tuned.<br><br>'
+        body    = '<br><br>Welcome to your profile '+str(user)+', it\'s great that you made an account.<br>You will see an updated profile page here soon, stay tuned.<br><br>'
     else:
-        body        = '<br><br>Please create an account or login using the links above.<br><br>'
+        body    = '<br><br>Please create an account or login using the links above.<br><br>'
 
     return return_html(body, txt, head, '')
 
@@ -152,11 +163,24 @@ def get_cookie_status(cookie):
         user    = 'none'
 
     if user != 'none':
-        body    = '<br><br>Success! Logged in as '+str(user)+' with cookie '+str(cookie)+'<br><br>'
+        body    = 'logged in as '+str(user)+'<br>'
     else:
-        body    = '<br><br>Failed! Not logged in.<br><br>'
+        body    = 'user not logged in<br>'
     
     return body, user
+
+# get home page
+def get_home(head, para):
+    body        = '<br><br>Welcome to the Cognito demo page!<br><br>This demo was written by Marek Kuczynski in Python and using the Serverless Application Model.<br><br>Checkout one of the menu options above to get started.'
+
+    return return_html(body, 'home', head, '')
+
+# logout
+def get_logout(cookie, user):
+    body        = 'logged out '+user
+    cookie      = 'user='+str(user)+'&cookie='+cookie+'; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+
+    return return_html(body, 'logged out '+user, 'logged out '+user, cookie)
 
 # lambda handler
 def handler(event, context):
@@ -172,8 +196,6 @@ def handler(event, context):
     host    = str(event['headers']['Host'])
     url     = str('https://'+host+'/Prod')
 
-    print('head ', head)
-
     # check if the cookie is valid
     try:
         cookie  = str(event['headers']['Cookie'])
@@ -185,23 +207,31 @@ def handler(event, context):
         print('cookie error '+str(e))
 
     auth, user    = get_cookie_status(cookie)
-
     print(path, meth, para, auth)
 
-    # handle get requests by returning an HTML page
+    # handle GET requests by returning an HTML page
+
     # register
     if meth == 'GET' and path == 'register':
-        x   = get_cred_page(head, 'register here')
+        x   = get_cred_page(head, 'register here', user)
+
+    # login
+    elif meth == 'GET' and path == 'login':
+        x   = get_cred_page(head, 'login here', user)
 
     # profile
     elif meth == 'GET' and path == 'profile':
         x   = get_profile_page(head, 'your profile', user, cookie)
 
-    # login
-    elif meth == 'GET' and path == 'login':
-        x   = get_cred_page(head, 'login here')
-      
-    # hande post requests by submitting the query strings to the api
+    # logout
+    elif meth == 'GET' and path == 'logout':
+        x   = get_logout(cookie, user)
+
+    elif meth == 'GET' and path == 'status':
+        x   = return_html('success', 'success', 'success', '')
+
+    # handle POST requests by submitting the query strings to the api using 'para'
+
     # register
     elif meth == 'POST' and path == 'register':
         x   = post_register(head, para)
@@ -210,9 +240,9 @@ def handler(event, context):
     elif meth == 'POST' and path == 'login':
         x   = post_login(head, para)    
 
-    # if another request was submitted, return an error code
+    # the home page, which default on any other request
     else:
-        x   = return_html('invalid request, try <a href="/login">login</a> instead', 'invalid request', head, '')
+        x   = get_home(head, para)
 
     # print the results and return them to the browser
     print('html '+str(x))
