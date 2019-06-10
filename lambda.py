@@ -199,7 +199,7 @@ def get_cookie_status(cookie):
 
 # GET home page
 def get_home(head, para):
-    body        = 'Welcome to the Cognito demo page!<br><br>This demo was written by Marek Kuczynski in Python using Cognito, Lambda, API Gateway and Cognito.<br><br>It is using the Serverless Application Model and the sourcecode can be found <a href = "https://github.com/marekq/serverless-cognito" target="_blank">here</a>.<br><br>Checkout one of the menu options above to get started.'
+    body        = '<h1>Welcome to the Cognito demo page!</h1><br><br><img src="https://marek-serverless.s3.amazonaws.com/serverless-cognito.svg"><br><br><br>This demo was written by Marek Kuczynski in Python using Cognito, Lambda, API Gateway and Cognito.<br><br>It is using the Serverless Application Model and the sourcecode can be found <a href = "https://github.com/marekq/serverless-cognito" target="_blank">here</a>.<br><br>Checkout one of the menu options above to get started.'
 
     return return_html(body, 'home', head, '')
 
@@ -216,7 +216,7 @@ def get_logout(cookie, user):
 
 # GET users
 def get_users(title, user):
-    if len(user) != 0:
+    if user != 'none':
         b       = []
         x       = cognito.list_users(UserPoolId = userpoolid)
         body    = '<table width = "600"><tr><th>username</th><th>status</th><th>user create</th><th>user modify</th></tr><tr><td>'
