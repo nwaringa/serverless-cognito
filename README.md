@@ -6,8 +6,8 @@ Authenticate your users through Cognito, Lambda, API Gateway and DynamoDB. The s
 The cookies are stored in a DynamoDB table that is part of the deployment. All user accounts are safely stored using a Cognito user pool. The Lambda function handles authentication, authorization and renders the HTML output. A second DynamoDB table is used to store the weblogs from user visits. 
 
 
-![alt text](./main.svg)
-<img src="./main.svg">
+![alt text](./diagrams/main.svg)
+<img src="./diagrams/main.svg">
 
 You can easily deploy the solution using the [Serverless Application Repository](https://serverlessrepo.aws.amazon.com/applications/arn:aws:serverlessrepo:us-east-1:517266833056:applications~serverless-cognito).
 
