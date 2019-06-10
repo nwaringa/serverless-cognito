@@ -7,7 +7,7 @@ The cookies are stored in a DynamoDB table that is part of the deployment. All u
 
 
 ![alt text](./diagrams/main.svg)
-<img src="./diagrams/main.svg">
+
 
 You can easily deploy the solution using the [Serverless Application Repository](https://serverlessrepo.aws.amazon.com/applications/arn:aws:serverlessrepo:us-east-1:517266833056:applications~serverless-cognito).
 
