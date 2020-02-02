@@ -12,8 +12,8 @@ region='eu-west-1'
 
 # rebuild the lambda package 
 echo -e "\n${RED}@@@ downloading packages with pip3${NC}\n"
-#rm -rf $dirn && mkdir $dirn
-#pip3 install -r ./lambda/requirements.txt -t ./lambda/libs -U
+rm -rf $dirn && mkdir $dirn
+pip3 install -r ./lambda/requirements.txt -t ./lambda/libs -U
 
 # run sam validate to check the sam template
 echo -e "\n${RED}@@@ running sam validate locally to test function${NC}\n"
