@@ -1,7 +1,7 @@
 {
     "path": "/home",
     "httpMethod": "GET",
-    "body": "",
+    "body": "home",
     "headers": {
         "Host": "marek.rocks"
     }

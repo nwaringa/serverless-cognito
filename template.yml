@@ -1,24 +1,16 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: 'AWS::Serverless-2016-10-31'
 
-Parameters:
-    BucketName:
-        Type: String
-    CodeKey:
-        Type: String
-
 Resources:
   cognitoauth:
     Type: 'AWS::Serverless::Function'
     Properties:
       Handler: lambda.handler
-      Runtime: python3.7
+      Runtime: python3.8
       Policies: 
         - AmazonCognitoPowerUser
         - AmazonDynamoDBFullAccess
-      CodeUri: 
-        Bucket: !Ref BucketName
-        Key: !Ref CodeKey
+      CodeUri: lambda/
       Description: 'Lambda function to serve HTML traffic through API Gateway'
       MemorySize: 256
       Timeout: 5
@@ -26,15 +18,10 @@ Resources:
       ReservedConcurrentExecutions: 3
       Events:
         GetHtml:
-          Type: Api
+          Type: HttpApi
           Properties:
             Path: '/{proxy+}'
-            Method: get
-        PostHtml:
-          Type: Api
-          Properties:
-            Path: '/{proxy+}'
-            Method: post
+            Method: any
       Environment:
         Variables:
           userpoolid: !Ref cognitopool
@@ -104,4 +91,4 @@ Resources:
 
 Outputs:
   WebInterface:
-    Value: { "Fn::Sub" : "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/home/"}
+    Value: { "Fn::Sub" : "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/home/"}

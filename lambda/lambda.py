@@ -5,7 +5,7 @@
 # coding: utf-8
 
 # import neccesary libraries
-import boto3
+import base64, boto3, json, sys
 from os import environ
 from time import time
 from re import search
@@ -15,15 +15,25 @@ from random import randint
 from boto3.dynamodb.conditions import Key, Attr
 from urllib.parse import unquote
 
+sys.path.append('./libs')
+from aws_xray_sdk.core import xray_recorder
+from aws_xray_sdk.core import patch_all
+
+patch_all()
+
+
 # take lambda environment variables for cognito
 clientid    = environ['clientid']
 userpoolid  = environ['userpoolid']
+
 
 # set up connections with cognito and dynamodb using boto3
 cognito     = boto3.client('cognito-idp')
 dynamo      = boto3.resource('dynamodb').Table(environ['dynamotable'])
 
+
 # return html with a 200 code, the client headers are printed by default
+@xray_recorder.capture("return_html")
 def return_html(body, title, head, cookie):
 
     # return a cookie header if neccesary
@@ -38,8 +48,10 @@ def return_html(body, title, head, cookie):
         'body': '<html><head><style>body {font-family: Arial, Helvetica, sans-serif;}</style></head><body><center><br><h1>'+title+'</h1><br><a href = "'+url+'/home">home</a> | <a href = "'+url+'/login">login</a> | <a href = "'+url+'/register">register</a> | <a href = "'+url+'/users">all users</a> | <a href = "'+url+'/profile">your profile</a> | <a href = "'+url+'/logout">logout</a> | '+auth+'<br><br><br>'+str(body)+'</center></body></html>', 
         'headers': h
     } 
-    
+
+
 # get the POSTed string username and password from the headers
+@xray_recorder.capture("get_creds")
 def get_creds(para):
     user    = ''
     pasw    = ''
@@ -53,10 +65,15 @@ def get_creds(para):
          
     return user, pasw
 
+
 # check if the cookie is valid based on the full cookie string, return the user
+@xray_recorder.capture("check_cookie")
 def check_cookie(x):
     user    = x.split('&')[0].split('=')[1]
     cookie  = x.split('&')[1].split('=')[1]
+
+    print('USER '+user)
+    print('COOKIE '+cookie)
 
     # check if the cookie is present in dynamodb
     print('check_cookie: '+str(user)+' '+str(cookie))
@@ -73,6 +90,7 @@ def check_cookie(x):
         return user
 
 # generate a random cookie for the user and write it to DynamoDB.
+@xray_recorder.capture("make_cookie")
 def make_cookie(user):
 
     # calculate the unix timestamp
@@ -102,6 +120,7 @@ def make_cookie(user):
     return x
 
 # POST register
+@xray_recorder.capture("post_register")
 def post_register(head, para):
     user, pasw  = get_creds(para)
     
@@ -121,15 +140,20 @@ def post_register(head, para):
             auth        = 'logged in as '+str(user)+'<br>'
 
             # return the cookie to the browser
-            return return_html('created user '+user, 'created user '+user, '', cookie)
+            txt = 'created user '+user
+            return return_html(txt, '', head, '')
         
         except Exception as e:
-            return return_html('error with registration '+str(e), '', head, '')
+            txt = 'error with registration '+str(e)
+            return return_html(txt, '', head, '')
             
     else:
-        return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, head, '')
+        txt = 'invalid user or password entered, this is what i received:\nusername: '+str(user)+'\npassword: '+str(pasw)
+        return return_html(txt, '', head, '')
+
 
 # POST login
+@xray_recorder.capture("post_login")
 def post_login(head, para):
     user, pasw  = get_creds(para)
     
@@ -159,8 +183,10 @@ def post_login(head, para):
     else:
         return return_html('invalid user or password entered, this is what i received:\nusername: '+user+'\npassword: '+pasw, '', head, '')
 
+
 # GET login
 # GET registration 
+@xray_recorder.capture("get_cred_page")
 def get_cred_page(head, txt, user):
 
     if user == 'none':
@@ -175,6 +201,7 @@ def get_cred_page(head, txt, user):
     return return_html(body, txt, head, '')
 
 # GET profile page
+@xray_recorder.capture("get_profile_page")
 def get_profile_page(head, txt, user, cookie):  
     if user != 'none':  
         body    = 'Welcome to your profile '+str(user)+', it\'s great that you made an account.<br><br>You will see an updated profile page here soon, stay tuned.'
@@ -183,7 +210,9 @@ def get_profile_page(head, txt, user, cookie):
 
     return return_html(body, txt, head, '')
 
+
 # check if the cookie is valid and return html
+@xray_recorder.capture("get_cookie_status")
 def get_cookie_status(cookie):
     if cookie != 'none': 
         user    = check_cookie(cookie)
@@ -197,13 +226,17 @@ def get_cookie_status(cookie):
     
     return body, user
 
+
 # GET home page
+@xray_recorder.capture("get_home")
 def get_home(head, para):
     body        = '<h1>Welcome to the Cognito demo page!</h1><br><br><img src="https://marek-serverless.s3.amazonaws.com/serverless-cognito.svg"><br><br><br>This demo was written by Marek Kuczynski in Python using Cognito, Lambda, API Gateway and Cognito.<br><br>It is using the Serverless Application Model and the sourcecode can be found <a href = "https://github.com/marekq/serverless-cognito" target="_blank">here</a>.<br><br>Checkout one of the menu options above to get started.'
 
     return return_html(body, 'home', head, '')
 
+
 # GET logout
+@xray_recorder.capture("get_login")
 def get_logout(cookie, user):
     body        = 'logged out '+user
     cookie      = 'user='+str(user)+'&cookie='+cookie+'; expires=Thu, 01 Jan 1970 00:00:00 GMT'
@@ -214,7 +247,9 @@ def get_logout(cookie, user):
 
     return return_html(body, 'logged out '+user, 'logged out '+user, cookie)
 
+
 # GET users
+@xray_recorder.capture("get_users")
 def get_users(title, user):
     if user != 'none':
         b       = []
@@ -231,23 +266,28 @@ def get_users(title, user):
     else:
         return return_html('you need to login for this functionality', title, 'all users', '')
 
+
 # lambda handler
+@xray_recorder.capture("lambda_handler")
 def handler(event, context):
     # seth auth and url variables to global
     global auth
     global url
 
     # read the request variables from the client
-    head    = str(event)
+    head    = event
     meth    = str(event['httpMethod'])
     path    = str(event['path']).strip('/')
-    para    = str(event['body'])
+    para    = event['body']
+
     host    = str(event['headers']['Host'])
-    url     = str('https://'+host+'/Prod')
+    url     = str('https://'+host)
 
     # check if the cookie is valid
     try:
-        cookie  = str(event['headers']['Cookie'])
+        print('COOKIE', event['headers']['cookie'])
+
+        cookie  = str(event['headers']['cookie'])
         print('cookie '+cookie)
 
     # if no cookie is found, set cookie and user fields to blank

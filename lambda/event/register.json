@@ -1,0 +1,8 @@
+{
+    "path": "/register",
+    "httpMethod": "GET",
+    "body": "register",
+    "headers": {
+        "Host": "marek.rocks"
+    }
+}
